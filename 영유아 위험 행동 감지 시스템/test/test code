@@ -1,0 +1,104 @@
+import keras
+from keras import applications
+from keras.preprocessing.image import ImageDataGenerator
+from keras import optimizers
+from keras.models import Sequential, Model
+from keras.layers import *
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler, TensorBoard, EarlyStopping
+import os
+import cv2
+import numpy as np
+from sklearn.model_selection import train_test_split
+import keras_metrics as km
+from keras import regularizers, optimizers
+from keras.callbacks import ModelCheckpoint
+from sklearn.metrics import precision_score, classification_report
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import cohen_kappa_score
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import multilabel_confusion_matrix
+from sklearn.metrics import accuracy_score
+
+data_dir = "C:\\Users\\user\\Desktop\\data_set\\"
+
+img_height, img_width = 64, 64
+seq_len = 16
+
+classes = ["climb", "fall", "falldown", "swallow", "obj", "walk"]
+
+def frames_extraction(video_path):
+    frames_list = []
+
+    vidcap = cv2.VideoCapture(video_path)
+    total_frames = vidcap.get(cv2.CAP_PROP_FRAME_COUNT)
+
+    frames_step = total_frames // seq_len
+
+    for j in range(seq_len):
+        # here, we set the parameter 1 which is the frame number to the frame (i*frames_step)
+        vidcap.set(1, j * frames_step)
+        success, image = vidcap.read()
+        # save your image
+        if success:
+            image = cv2.resize(image, (img_height, img_width))
+            frames_list.append(image)
+        else:
+            print("Defected frame {}".format(video_path))
+            break
+
+    return frames_list
+
+def create_data(input_dir):
+    X = []
+    Y = []
+
+    classes_list = os.listdir(input_dir)
+
+    for c in classes_list:
+        print(c)
+        files_list = os.listdir(os.path.join(input_dir, c))
+        for f in files_list:
+            frames = frames_extraction(os.path.join(os.path.join(input_dir, c), f))
+            if len(frames) == seq_len:
+                X.append(frames)
+
+                y = [0] * len(classes)
+                y[classes.index(c)] = 1
+                Y.append(y)
+
+    X = np.asarray(X)
+    Y = np.asarray(Y)
+    return X, Y
+
+
+X, Y = create_data(data_dir)
+X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.20, shuffle=True, random_state=0)
+
+model = Sequential()
+model.add(ConvLSTM2D(filters=64, kernel_size=(3, 3), return_sequences=False, data_format="channels_last",
+                     input_shape=(seq_len, img_height, img_width, 3)))
+model.add(Dropout(0.2))
+model.add(Flatten())
+model.add(Dense(256, activation="relu"))
+model.add(Dropout(0.3))
+model.add(Dense(6, activation="softmax"))
+
+model.summary()
+
+opt = keras.optimizers.SGD(lr=0.001)
+model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=["accuracy"])
+
+earlystop = EarlyStopping(patience=7)
+callbacks = [earlystop]
+
+
+history = model.fit(x=X_train, y=y_train, epochs=5, batch_size=5, shuffle=True, validation_split=0.2,
+                    callbacks=callbacks)
+
+y_pred = model.predict(X_test)
+y_pred = np.argmax(y_pred, axis=1)
+y_test = np.argmax(y_test, axis=1)
+
+print(classification_report(y_test, y_pred))
+
