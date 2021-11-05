@@ -1,0 +1,25 @@
+import errno
+
+import cv2
+import os
+
+try:
+    if not (os.path.isdir('name')):
+        os.makedirs(os.path.join('name'))
+except OSError as e:
+    if e.errno != errno.EEXIST:
+        print("폴더 생성 실패!")
+        exit()
+
+video_file='video_path'
+vidcap = cv2.VideoCapture(video_file)
+total_frames=vidcap.get(cv2.CAP_PROP_FRAME_COUNT)
+frames_step=total_frames/16
+
+for i in range(16):
+    vidcap.set(1,i*frames_step)
+    success,image=vidcap.read()
+    image = cv2.resize(image, (300, 300))
+    cv2.imwrite('path/%d.jpg' %i, image)
+    print('Saved image number: '+str(int(i))+'.jpg')
+vidcap.release()

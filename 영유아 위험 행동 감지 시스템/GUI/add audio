@@ -1,0 +1,273 @@
+def audio():
+    import pyaudio
+    import wave
+
+    po = pyaudio.PyAudio()
+
+    for index in range(po.get_device_count()):
+        desc = po.get_device_info_by_index(index)
+
+        # if desc["name"] == "record":
+
+        print("DEVICE: %s  INDEX:  %s  RATE:  %s " % (desc["name"], index, int(desc["defaultSampleRate"])))
+
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 2
+    RATE = 44100
+    CHUNK = 1024
+    RECORD_SECONDS = 5
+    WAVE_OUTPUT_FILENAME = "file.wav"
+    audio = pyaudio.PyAudio()
+
+    # start Recording
+    stream = audio.open(format=pyaudio.paInt16,
+                        channels=CHANNELS,
+                        rate=RATE,
+                        input=True,
+                        input_device_index=1,
+                        frames_per_buffer=CHUNK)
+
+    print("recording...")
+
+    frames = []
+    for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+        data = stream.read(CHUNK)
+
+        frames.append(data)
+
+    print("finished recording")
+
+    # stop Recording
+    stream.stop_stream()
+    stream.close()
+    audio.terminate()
+    waveFile = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+    waveFile.setnchannels(CHANNELS)
+    waveFile.setsampwidth(audio.get_sample_size(FORMAT))
+    waveFile.setframerate(RATE)
+    waveFile.writeframes(b''.join(frames))
+    waveFile.close()
+
+
+def camera():
+    import cv2
+    import numpy as np
+    import time
+
+    thresh = 25
+    max_diff = 5
+    img_counter = 0
+    frame_set = []
+    start_time = time.time()
+
+    a, b, c = None, None, None
+
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 320)
+
+    if cap.isOpened():
+        ret, a = cap.read()
+        ret, b = cap.read()
+        while ret:
+            ret, c = cap.read()
+            draw = c.copy()
+            if not ret:
+                break
+
+            a_gray = cv2.cvtColor(a, cv2.COLOR_BGR2GRAY)
+            b_gray = cv2.cvtColor(b, cv2.COLOR_BGR2GRAY)
+            c_gray = cv2.cvtColor(c, cv2.COLOR_BGR2GRAY)
+
+            diff1 = cv2.absdiff(a_gray, b_gray)
+            diff2 = cv2.absdiff(b_gray, c_gray)
+
+            ret, diff1_t = cv2.threshold(diff1, thresh, 255, cv2.THRESH_BINARY)
+            ret, diff2_t = cv2.threshold(diff2, thresh, 255, cv2.THRESH_BINARY)
+
+            diff = cv2.bitwise_and(diff1_t, diff2_t)
+
+            k = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+            diff = cv2.morphologyEx(diff, cv2.MORPH_OPEN, k)
+
+            diff_cnt = cv2.countNonZero(diff)
+            if diff_cnt > max_diff:
+                nzero = np.nonzero(diff)
+                cv2.rectangle(draw, (min(nzero[1]), min(nzero[0])),
+                              (max(nzero[1]), max(nzero[0])), (0, 255, 0), 2)
+
+                cv2.putText(draw, "Motion detected!!", (10, 30),
+                            cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 255))
+
+            cv2.imshow('motion', draw)
+
+            a = b
+            b = c
+            
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            if time.time() - start_time >= 0.2:  # <---- Check if 0.2 sec passed
+                c = cv2.resize(c, (64, 64))
+                frame_set.append(c)
+                print("{} written!".format(img_counter))
+                start_time = time.time()
+            img_counter += 1
+            if len(frame_set) >= 17:
+                del frame_set[0]
+
+
+from tkinter import *
+import tkinter.messagebox
+
+win = Tk()  # 창 생성
+win.geometry("1300x700")
+win.title("Child Risk Prevention System")
+win.option_add("*Font", "Georgia 10")
+win.configure(bg='#FFCCCC')
+
+# 카메라 라벨
+lab0 = Label(win)
+lab0.config(text="Turning on camera ")
+lab0.configure(bg='#FFA7A7')
+lab0.place(x=800, y=100)
+
+# 버튼
+btn0 = Button(win, text="Camera")
+btn0.config(width=30, height=30)
+btn0.place(x=800, y=130)
+img0 = PhotoImage(file='./camera.png', master=win)
+img0 = img0.subsample(25)
+btn0.config(image=img0)
+btn0.config(command=camera)
+
+# 라벨
+lab1 = Label(win)
+lab1.config(text="Text will be sent in case of danger. ")
+lab1.configure(bg='#FFA7A7')
+lab1.place(x=800, y=230)
+
+# 전화 번호 입력창
+ent = Entry(win)
+ent.insert(0, "Just enter a number.")
+
+
+def clear(event):
+    if ent.get() == "Just enter a number.":
+        ent.delete(0, len(ent.get()))
+
+
+ent.bind("<Button-1>", clear)
+ent.place(x=800, y=260)
+ent.configure(bg='#FFC19E')
+#ent.bind("<Double-Button-2>", callsms)
+
+
+
+def callsms(self):
+    import sys
+    from sdk.api.message import Message
+    from sdk.exceptions import CoolsmsException
+    api_key = "NCSIAKAHOQDSODRN"
+    api_secret = "Y42NPXZBUAVLJPO7PIKMWKWNNTHGWQZS"
+    ## 4 params(to, from, type, text) are mandatory. must be filled
+    params = dict()
+    params['type'] = 'sms'  # Message type ( sms, lms, mms, ata )
+    params['to'] = ent.get()  # Recipients Number '01000000000,01000000001'
+    params['from'] = '01072108042'  # Sender number
+    params['text'] = 'The child is in danger.'  # Message
+    cool = Message(api_key, api_secret)
+    try:
+        response = cool.send(params)
+        print("Success Count : %s" % response['success_count'])
+        print("Error Count : %s" % response['error_count'])
+        print("Group ID : %s" % response['group_id'])
+    except CoolsmsException as e:
+        print("Error Code : %s" % e.code)
+        print("Error Message : %s" % e.msg)
+    sys.exit()
+
+
+def Msgbox():
+    tkinter.messagebox.showerror("message", "Input Error(Number only)")
+
+
+def alert():
+    regex = re.compile("^[0-9]{11}$")
+    if regex.findall(ent.get()):
+        lab2.config(text="Saved~!")
+        params = dict()
+        params['to'] = ent.get()
+        print(params['to'])
+        lab2.configure(bg='#FFA7A7')
+    else:
+        Msgbox()
+
+
+def alert1():
+    regex = re.compile("^[0-9]{11}$")
+    if regex.findall(ent.get()):
+        lab2.config(text="Replace Successful~!")
+        lab2.configure(bg='#FFA7A7')
+        print(ent.get())
+    else:
+        Msgbox()
+    # 저장 버튼
+
+
+btn = Button(win, text="Save")
+btn.config(command=alert)
+btn.config(width=30, height=30)
+btn.place(x=800, y=300)
+img = PhotoImage(file='./check.png', master=win)
+img = img.subsample(25)
+btn.config(image=img)
+
+# 수정 버튼
+btn_ = Button(win, text="Change")
+btn_.config(command=alert1)
+btn_.config(width=30, height=30)
+btn_.place(x=880, y=300)
+img_ = PhotoImage(file='./exchange.png', master=win)
+img_ = img_.subsample(25)
+btn_.config(image=img_)
+
+# 메시지 라벨
+lab2 = Label(win)
+lab2.place(x=800, y=350)
+lab2.configure(bg='#FFCCCC')
+
+# 라벨
+lab3 = Label(win)
+lab3.config(text="Start recording for 5 seconds.")
+lab3.configure(bg='#FFA7A7')
+lab3.place(x=800, y=450)
+lab4 = Label(win)
+lab4.config(text="It is broadcast when the child catches dangerous substances ")
+lab4.configure(bg='#FFA7A7')
+lab4.place(x=800, y=470)
+
+# 녹음 시작 버튼
+btn1 = Button(win, text="Start")
+# btn.config(command=alert)
+btn1.config(width=30, height=30)
+btn1.place(x=800, y=520)
+img1 = PhotoImage(file='./microphone.png', master=win)
+img1 = img1.subsample(25)
+btn1.config(image=img1)
+btn1.config(command=audio)
+
+
+# exit
+def close_window():
+    win.destroy()
+
+
+btn2 = Button(win, text="Exit")
+btn2.config(command=close_window)
+btn2.place(x=800, y=600)
+img2 = PhotoImage(file='./exit.png', master=win)
+img2 = img2.subsample(25)
+btn2.config(width=30, height=30)
+btn2.config(image=img2)
+
+win.mainloop()  # 창 실행
