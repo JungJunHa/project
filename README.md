@@ -5,6 +5,7 @@
 # 경시대회
 1. [Dacon]
 - 자율주행 안테나 성능 예측 경진대회(LG 주최)
+- 2021년(제2회) NH투자증권 빅데이터 경진대회
 - 2022 관광데이터 AI 경진대회
 2. [Kaggle]
 - G-Research Crypto Forecasting
