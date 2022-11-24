@@ -10,6 +10,4 @@
 2. [Kaggle]
 - G-Research Crypto Forecasting
 - Store Sales - Time Series Forecasting
-3. 그 외
-- FSI DATA CHALLENGE 2022(금융감독원 주최)
-- NH투자증권 빅데이터 경진대회(AI Factory 주최)
+- OTTO – Multi-Objective Recommender System
